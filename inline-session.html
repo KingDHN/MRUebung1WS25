@@ -20,42 +20,44 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -->
 <html>
-<head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
-    <meta name='mobile-web-app-capable' content='yes'>
-    <meta name='apple-mobile-web-app-capable' content='yes'>
-    <link rel='icon' type='image/png' sizes='32x32' href='favicon-32x32.png'>
-    <link rel='icon' type='image/png' sizes='96x96' href='favicon-96x96.png'>
-    <link rel='stylesheet' href='css/common.css'>
 
-    <title>Inline Session</title>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
+  <meta name='mobile-web-app-capable' content='yes'>
+  <meta name='apple-mobile-web-app-capable' content='yes'>
+  <link rel='icon' type='image/png' sizes='32x32' href='favicon-32x32.png'>
+  <link rel='icon' type='image/png' sizes='96x96' href='favicon-96x96.png'>
+  <link rel='stylesheet' href='css/common.css'>
+
+  <title>Inline Session</title>
 </head>
+
 <body>
-<header>
+  <header>
     <details open>
-        <summary>Inline Session</summary>
-        <p>
-            This sample demonstrates use of an 'inline' XRSession to present
-            content on the page prior to entering XR presentation with an
-            immersive session. The viewer pose can be adjusted by clicking and
-            dragging with mouse or touch.
-            <a class="back" href="./">Back</a>
-        <p>
-            <input id='vertFOV' value='90' min='30' max='150' step='10' type='range'/><br/>
-            <label id='vertFOVLabel' for="vertFOV">Vertical FOV: </label>
-        </p>
-        </p>
+      <summary>Inline Session</summary>
+      <p>
+        This sample demonstrates use of an 'inline' XRSession to present
+        content on the page prior to entering XR presentation with an
+        immersive session. The viewer pose can be adjusted by clicking and
+        dragging with mouse or touch.
+        <a class="back" href="./">Back</a>
+      <p>
+        <input id='vertFOV' value='90' min='30' max='150' step='10' type='range' /><br />
+        <label id='vertFOVLabel' for="vertFOV">Vertical FOV: </label>
+      </p>
+      </p>
     </details>
-</header>
-<script type="module">
-    import {WebXRButton} from './js/util/webxr-button.js';
-    import {Scene} from './js/render/scenes/scene.js';
-    import {Renderer, createWebGLContext} from './js/render/core/renderer.js';
-    import {Gltf2Node} from './js/render/nodes/gltf2.js';
-    import {SkyboxNode} from './js/render/nodes/skybox.js';
-    import {mat4, vec3, quat} from './js/render/math/gl-matrix.js';
-    import {QueryArgs} from './js/util/query-args.js';
+  </header>
+  <script type="module">
+    import { WebXRButton } from './js/util/webxr-button.js';
+    import { Scene } from './js/render/scenes/scene.js';
+    import { Renderer, createWebGLContext } from './js/render/core/renderer.js';
+    import { Gltf2Node } from './js/render/nodes/gltf2.js';
+    import { SkyboxNode } from './js/render/nodes/skybox.js';
+    import { mat4, vec3, quat } from './js/render/math/gl-matrix.js';
+    import { QueryArgs } from './js/util/query-args.js';
 
     // If requested, use the polyfill to provide support for mobile devices
     // and devices which only support WebVR.
@@ -99,14 +101,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     let xrButton = null;
     let xrImmersiveRefSpace = null;
     let xrInlineRefSpace = null;
+    let xrButtonAR = null;
+    let arStarted = false;
+
 
     // WebGL scene globals.
     let gl = null;
     let renderer = null;
     let scene = new Scene();
-    let solarSystem = new Gltf2Node({url: 'media/gltf/space/space.gltf'});
+    let solarSystem = new Gltf2Node({ url: 'media/gltf/space/space.gltf' });
     scene.addNode(solarSystem);
-    scene.addNode(new SkyboxNode({url: 'media/textures/milky-way-4k.png'}));
+
+    let skybox = new SkyboxNode({ url: 'media/textures/milky-way-4k.png' });
+    scene.addNode(skybox);
+
+
 
     function initXR() {
       console.log("wir sind in initXR");
@@ -122,27 +131,66 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
           xrButton.enabled = supported;
         });
 
+
+
+        xrButtonAR = new WebXRbutton({
+          onRequestSession: onRequestSessionAR,
+          onEndSession: onEndSession,
+          textEnterXRTitle: "START AR",
+          textXRNotFoundTitle: "AR NOT FOUND",
+          textExitXRTitle: "EXIT AR",
+        });
+        document.querySelector('header').appendChild(xrButtonAR.domElement);
+
+
+        if (navigator.xr) {
+          navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+            xrButtonAR.enabled = supported;
+          });
+        }
+
         // Start up an inline session, which should always be supported on
         // browsers that support WebXR regardless of the available hardware.
-        navigator.xr.requestSession('inline').then((session) => {
-          inlineSession = session;
-          onSessionStarted(session);
-          updateFov();
-        });
+
+
+        if (navigator.xr) {
+          navigator.xr.requestSession('inline').then((session) => {
+            inlineSession = session;
+            onSessionStarted(session);
+            updateFov();
+          });
+        }
+
       }
     }
+
+
 
     function onRequestSession() {
       return navigator.xr.requestSession('immersive-vr').then((session) => {
         xrButton.setSession(session);
-        // Set a flag on the session so we can differentiate it from the
-        // inline session.
         session.isImmersive = true;
+        arStarted = false;
         onSessionStarted(session);
       });
     }
 
+
+    function onRequestSessionAR() {
+      return navigator.xr.requestSession('immersive-ar').then((session) => {
+        xrButtonAR.setSession(session);
+        session.isImmersive = true;
+        arStarted = true;
+        onSessionStarted(session);
+      });
+
+    }
+
+
+
     function onSessionStarted(session) {
+      console.log("XR-Session gestartet:", session);
+
       session.addEventListener('end', onSessionEnded);
 
       if (!gl) {
@@ -170,9 +218,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         addInlineViewListeners(gl.canvas);
 
         renderer = new Renderer(gl);
-
         scene.setRenderer(renderer);
       }
+
+
+      if (session.isImmersive && arStarted) {
+        skybox.visible = false;
+
+      } else {
+        skybox.visible = true;
+      }
+
+      session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+
+      session.requestReferenceSpace('local').then((refSpace) => {
+        xrImmersiveRefSpace = refSpace;
+        session.requestAnimationFrame(onXRFrame);
+      });
+
+
+
+
 
       // WebGL layers for inline sessions won't allocate their own framebuffer,
       // which causes gl commands to naturally execute against the default
@@ -213,8 +279,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       let session = frame.session;
       // Ensure that we're using the right frame of reference for the session.
       let refSpace = session.isImmersive ?
-                       xrImmersiveRefSpace :
-                       xrInlineRefSpace;
+        xrImmersiveRefSpace :
+        xrInlineRefSpace;
 
       // Account for the click-and-drag mouse movement or touch movement when
       // calculating the viewer pose for inline sessions.
@@ -236,7 +302,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         for (let view of pose.views) {
           let viewport = glLayer.getViewport(view);
           gl.viewport(viewport.x, viewport.y,
-                      viewport.width, viewport.height);
+            viewport.width, viewport.height);
 
           scene.draw(view.projectionMatrix, view.transform);
         }
@@ -263,18 +329,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       quat.rotateX(invOrientation, invOrientation, -lookPitch);
       quat.rotateY(invOrientation, invOrientation, -lookYaw);
       let xform = new XRRigidTransform(
-          {x: 0, y: 0, z: 0},
-          {x: invOrientation[0], y: invOrientation[1], z: invOrientation[2], w: invOrientation[3]});
+        { x: 0, y: 0, z: 0 },
+        { x: invOrientation[0], y: invOrientation[1], z: invOrientation[2], w: invOrientation[3] });
       return refSpace.getOffsetReferenceSpace(xform);
     }
 
     function rotateView(dx, dy) {
       lookYaw += dx * LOOK_SPEED;
       lookPitch += dy * LOOK_SPEED;
-      if (lookPitch < -Math.PI*0.5)
-          lookPitch = -Math.PI*0.5;
-      if (lookPitch > Math.PI*0.5)
-          lookPitch = Math.PI*0.5;
+      if (lookPitch < -Math.PI * 0.5)
+        lookPitch = -Math.PI * 0.5;
+      if (lookPitch > Math.PI * 0.5)
+        lookPitch = Math.PI * 0.5;
     }
 
     // Make the canvas listen for mouse and touch events so that we can
@@ -342,6 +408,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // Start the XR application.
     initXR();
-</script>
+  </script>
 </body>
+
 </html>
